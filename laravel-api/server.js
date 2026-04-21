@@ -18,7 +18,7 @@ const io = new Server(httpServer, {
   },
 });
 
-const PORT = Number(process.env.PORT || 4000);
+const PORT = Number(4000);
 
 // Keep everything room scoped so we can separate each call cleanly.
 const roomState = new Map();
@@ -87,6 +87,10 @@ function getProducerIdsForPeer(room, socketId) {
   return ids;
 }
 
+function findRoomBySocketId(socketId) {
+  return [...roomState.values()].find((entry) => entry.peers.has(socketId));
+}
+
 io.on('connection', (socket) => {
   const onSignal = (eventNames, handler) => {
     for (const eventName of eventNames) {
@@ -113,6 +117,11 @@ io.on('connection', (socket) => {
         transports: new Map(),
         producers: new Map(),
         consumers: new Map(),
+        mediaState: {
+          cameraEnabled: true,
+          micEnabled: true,
+          screenSharingEnabled: false,
+        },
       });
       socket.data.roomCode = normalizedRoomCode;
 
@@ -129,7 +138,7 @@ io.on('connection', (socket) => {
 
   onSignal(['create-transport', 'createWebRtcTransport'], async ({ direction }, callback) => {
     try {
-      const peerEntry = [...roomState.values()].find((room) => room.peers.has(socket.id));
+      const peerEntry = findRoomBySocketId(socket.id);
       if (!peerEntry) throw new Error('Join room before creating transport.');
 
       const room = peerEntry;
@@ -159,7 +168,7 @@ io.on('connection', (socket) => {
 
   onSignal(['connect-transport', 'connectTransport'], async ({ transportId, dtlsParameters }, callback) => {
     try {
-      const room = [...roomState.values()].find((entry) => entry.peers.has(socket.id));
+      const room = findRoomBySocketId(socket.id);
       if (!room) throw new Error('Room not found.');
       const peer = getPeerOrThrow(room, socket.id);
 
@@ -176,7 +185,7 @@ io.on('connection', (socket) => {
 
   onSignal(['produce'], async ({ transportId, kind, rtpParameters }, callback) => {
     try {
-      const room = [...roomState.values()].find((entry) => entry.peers.has(socket.id));
+      const room = findRoomBySocketId(socket.id);
       if (!room) throw new Error('Room not found.');
       const peer = getPeerOrThrow(room, socket.id);
       const transportInfo = peer.transports.get(transportId);
@@ -197,7 +206,7 @@ io.on('connection', (socket) => {
 
   onSignal(['list-producers', 'listProducers'], (payload, callback) => {
     try {
-      const room = [...roomState.values()].find((entry) => entry.peers.has(socket.id));
+      const room = findRoomBySocketId(socket.id);
       if (!room) throw new Error('Room not found.');
 
       callback({ producerIds: getProducerIdsForPeer(room, socket.id) });
@@ -208,7 +217,7 @@ io.on('connection', (socket) => {
 
   onSignal(['consume'], async ({ producerId, rtpCapabilities }, callback) => {
     try {
-      const room = [...roomState.values()].find((entry) => entry.peers.has(socket.id));
+      const room = findRoomBySocketId(socket.id);
       if (!room) throw new Error('Room not found.');
 
       if (!room.router.canConsume({ producerId, rtpCapabilities })) {
@@ -242,7 +251,7 @@ io.on('connection', (socket) => {
 
   onSignal(['resume-consumer', 'resumeConsumer'], async ({ consumerId }, callback) => {
     try {
-      const room = [...roomState.values()].find((entry) => entry.peers.has(socket.id));
+      const room = findRoomBySocketId(socket.id);
       if (!room) throw new Error('Room not found.');
       const peer = getPeerOrThrow(room, socket.id);
       const consumer = peer.consumers.get(consumerId);
@@ -257,6 +266,72 @@ io.on('connection', (socket) => {
     }
   });
 
+  onSignal(['start-call', 'startCall'], (payload, callback) => {
+    try {
+      const room = findRoomBySocketId(socket.id);
+      if (!room) throw new Error('Room not found.');
+      const peer = getPeerOrThrow(room, socket.id);
+
+      socket.to(peer.roomCode).emit('call-started', { by: socket.id });
+      socket.emit('call-started', { by: socket.id });
+      console.log(`[start-call] socket=${socket.id} room=${peer.roomCode}`);
+      callback({ started: true });
+    } catch (error) {
+      callback({ error: error.message });
+    }
+  });
+
+  onSignal(['toggle-camera', 'toggleCamera'], ({ enabled }, callback) => {
+    try {
+      const room = findRoomBySocketId(socket.id);
+      if (!room) throw new Error('Room not found.');
+      const peer = getPeerOrThrow(room, socket.id);
+
+      const cameraEnabled = Boolean(enabled);
+      peer.mediaState.cameraEnabled = cameraEnabled;
+      socket.to(peer.roomCode).emit('peer-camera-toggled', { by: socket.id, enabled: cameraEnabled });
+      socket.emit('peer-camera-toggled', { by: socket.id, enabled: cameraEnabled });
+      console.log(`[toggle-camera] socket=${socket.id} enabled=${cameraEnabled}`);
+      callback({ cameraEnabled });
+    } catch (error) {
+      callback({ error: error.message });
+    }
+  });
+
+  onSignal(['toggle-mic', 'toggleMic'], ({ enabled }, callback) => {
+    try {
+      const room = findRoomBySocketId(socket.id);
+      if (!room) throw new Error('Room not found.');
+      const peer = getPeerOrThrow(room, socket.id);
+
+      const micEnabled = Boolean(enabled);
+      peer.mediaState.micEnabled = micEnabled;
+      socket.to(peer.roomCode).emit('peer-mic-toggled', { by: socket.id, enabled: micEnabled });
+      socket.emit('peer-mic-toggled', { by: socket.id, enabled: micEnabled });
+      console.log(`[toggle-mic] socket=${socket.id} enabled=${micEnabled}`);
+      callback({ micEnabled });
+    } catch (error) {
+      callback({ error: error.message });
+    }
+  });
+
+  onSignal(['toggle-screen-share', 'toggleScreenShare'], ({ enabled }, callback) => {
+    try {
+      const room = findRoomBySocketId(socket.id);
+      if (!room) throw new Error('Room not found.');
+      const peer = getPeerOrThrow(room, socket.id);
+
+      const screenSharingEnabled = Boolean(enabled);
+      peer.mediaState.screenSharingEnabled = screenSharingEnabled;
+      socket.to(peer.roomCode).emit('peer-screen-share-toggled', { by: socket.id, enabled: screenSharingEnabled });
+      socket.emit('peer-screen-share-toggled', { by: socket.id, enabled: screenSharingEnabled });
+      console.log(`[toggle-screen-share] socket=${socket.id} enabled=${screenSharingEnabled}`);
+      callback({ screenSharingEnabled });
+    } catch (error) {
+      callback({ error: error.message });
+    }
+  });
+
   socket.on('disconnect', () => {
     for (const [roomCode, room] of roomState.entries()) {
       const peer = room.peers.get(socket.id);
@@ -266,6 +341,7 @@ io.on('connection', (socket) => {
       for (const producer of peer.producers.values()) producer.close();
       for (const consumer of peer.consumers.values()) consumer.close();
       room.peers.delete(socket.id);
+      socket.to(roomCode).emit('peer-left', { socketId: socket.id });
 
       if (room.peers.size === 0) {
         roomState.delete(roomCode);

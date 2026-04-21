@@ -13,24 +13,53 @@
                 data-sfu-url="{{ $sfuUrl }}"
                 class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 space-y-4"
             >
-                <p class="text-gray-700">
-                    Open this same room code on another account/device to start a 1:1 call.
-                </p>
+                
 
                 <div class="flex gap-4">
                     <video id="local-video" autoplay playsinline muted class="w-1/2 bg-black rounded-md"></video>
                     <video id="remote-video" autoplay playsinline class="w-1/2 bg-black rounded-md"></video>
                 </div>
 
-                <div class="flex gap-3">
-                    <button id="start-call-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-md">
+                <div id="call-controls" class="flex flex-wrap gap-3">
+                    <button
+                        id="start-call-btn"
+                        type="button"
+                        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
                         Start Call
                     </button>
-                    <button id="leave-call-btn" class="px-4 py-2 bg-rose-600 text-white rounded-md">
-                        Leave
+                    <button
+                        id="toggle-camera-btn"
+                        type="button"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        disabled
+                    >
+                        Camera Off
+                    </button>
+                    <button
+                        id="toggle-mic-btn"
+                        type="button"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                        disabled
+                    >
+                        Mic Off
+                    </button>
+                    <button
+                        id="toggle-screen-share-btn"
+                        type="button"
+                        class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                        disabled
+                    >
+                        Share Screen
+                    </button>
+                    <button
+                        id="leave-call-btn"
+                        type="button"
+                        class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                    >
+                        Leave Call
                     </button>
                 </div>
-
                 <p id="call-status" class="text-sm text-gray-700">Waiting to start...</p>
             </div>
         </div>

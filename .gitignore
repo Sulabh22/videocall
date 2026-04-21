@@ -17,4 +17,3 @@ yarn-error.log
 /.idea
 /.vscode
 /node_modules
-git rebase -r --rebase-merges --root \--exec "git commit --amend --no-edit --author='Sulabh22 <108385168+Sulabh22@users.noreply.github.com>'"

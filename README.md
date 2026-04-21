@@ -91,4 +91,4 @@ For the smoothest local setup:
 - `laravel-api/resources/js/app.js`
 - `laravel-api/resources/views/dashboard.blade.php`
 - `laravel-api/resources/views/call.blade.php`
-- `node-sfu/src/server.js`
+- `laravel-api/server.js` (moved signaling server file)
