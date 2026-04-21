@@ -1,94 +1,107 @@
-# Fullstack Video Calling (Laravel + mediasoup)
+# Video Call App (Laravel + Socket.IO + mediasoup)
 
-This project contains **two separate services**:
+This repository is a fullstack 1:1 video calling app in a **single project**:
 
-1. `laravel-api` - authentication, room management, and frontend pages.
-2. `node-sfu` - Socket.IO signaling + mediasoup SFU media routing.
+- Laravel handles authentication, room management, and Blade UI.
+- A Node.js SFU server (`server.js`) handles signaling and mediasoup media routing.
 
-## Architecture (Clean and Simple)
+## Stack
 
-- `Laravel (Presentation/API Layer)`
-  - Breeze auth (register/login/profile)
-  - Room APIs
-  - Blade UI for creating/joining rooms and rendering call page
-- `Laravel (Application Layer)`
-  - `RoomService` handles room create/join business rules
-- `Laravel (Data Layer)`
-  - `RoomRepository` and Eloquent `Room` model
-- `Node SFU Service`
-  - mediasoup worker + router lifecycle
-  - WebRTC transport creation/connection
-  - produce / consume / resume-consumer events
-  - Socket.IO room signaling
+- PHP 8.1+, Laravel 10, Laravel Breeze
+- MySQL (XAMPP compatible)
+- Node.js + Vite (frontend assets)
+- Socket.IO + mediasoup (WebRTC SFU)
 
-## 1) Run Laravel Service
+## Project Structure
+
+- `app/Services/RoomService.php` - room creation and join business logic
+- `app/Repositories/RoomRepository.php` - room data access
+- `app/Http/Controllers/Api/RoomController.php` - room API endpoints
+- `resources/views/dashboard.blade.php` - create/join room UI
+- `resources/views/call.blade.php` - call page UI
+- `resources/js/app.js` - frontend call logic and WebRTC client flow
+- `server.js` - Socket.IO + mediasoup SFU server
+
+## Setup
+
+1. Clone and enter the project.
+2. Install PHP dependencies:
 
 ```bash
-cd laravel-api
+composer install
+```
+
+3. Install Node dependencies:
+
+```bash
+npm install
+```
+
+4. Configure environment:
+
+```bash
 cp .env.example .env
 php artisan key:generate
-# Create this MySQL database first (XAMPP): video_call_app
+```
+
+5. Create a MySQL database (example: `video_call_app`) and update `.env` if needed.
+6. Run migrations:
+
+```bash
 php artisan migrate
-npm install
-npm run dev
+```
+
+## Run the App (3 terminals)
+
+Terminal 1 - Laravel server:
+
+```bash
 php artisan serve
 ```
 
-Laravel runs on `http://127.0.0.1:8000` by default.
-
-## 2) Run Node SFU Service
+Terminal 2 - Vite dev server:
 
 ```bash
-cd node-sfu
-cp .env.example .env
-npm install
 npm run dev
 ```
 
-SFU runs on `http://localhost:4000` by default.
+Terminal 3 - SFU server:
 
-## mediasoup Windows note
+```bash
+node server.js
+```
 
-`mediasoup` may require build tooling on Windows (Visual Studio C++ build tools) depending on your Node version.
-For the smoothest local setup:
+Default local URLs:
 
-- Use Node.js 20 LTS for `node-sfu`
-- Install Visual Studio Build Tools (Desktop development with C++)
+- Laravel: `http://127.0.0.1:8000`
+- SFU: `http://localhost:4000`
 
-## How Video Call Works (Step-by-Step)
+## Environment Notes
 
-1. User logs in from Laravel authentication pages.
-2. User opens Dashboard and creates a room or joins an existing room code.
-3. App redirects to `/call/{ROOMCODE}` and loads the call UI.
-4. Left video panel (`local-video`) is used for webcam/microphone preview.
-5. On **Start Call**:
-   - frontend connects to Socket.IO SFU server (`SFU_SERVER_URL`)
-   - user joins room (`joinRoom`)
-   - mediasoup device is created in browser
-   - send transport is created and connected
-   - local audio/video tracks are produced to SFU
-6. Right video panel (`personalVideo`) is for personal/local playback:
-   - user selects a file from `videoInput`
-   - browser creates a local object URL (`URL.createObjectURL`)
-   - selected video plays directly in right panel
-   - this right panel playback does not depend on socket or mediasoup
-7. On **Leave**:
-   - socket disconnects
-   - transports close
-   - local tracks stop
-   - personal video player is reset
+- `SFU_SERVER_URL` is used by the call page and defaults to `http://localhost:4000`.
+- mediasoup uses UDP/TCP ports from `MEDIASOUP_MIN_PORT` / `MEDIASOUP_MAX_PORT` (see `server.js` defaults).
+- `LISTEN_IP` and `ANNOUNCED_IP` can be set in `.env` for different network setups.
 
 ## API Endpoints
 
-- `POST /api/rooms` (auth required) - create room
-- `POST /api/rooms/join` (auth required) - join room
+Authenticated routes:
 
-## Important Files
+- `POST /api/rooms` - create a room
+- `POST /api/rooms/join` - join a room by code
 
-- `laravel-api/app/Services/RoomService.php`
-- `laravel-api/app/Repositories/RoomRepository.php`
-- `laravel-api/app/Http/Controllers/Api/RoomController.php`
-- `laravel-api/resources/js/app.js`
-- `laravel-api/resources/views/dashboard.blade.php`
-- `laravel-api/resources/views/call.blade.php`
-- `laravel-api/server.js` (moved signaling server file)
+## Call Flow (High Level)
+
+1. User registers/logs in using Laravel Breeze.
+2. From dashboard, user creates a room or joins with a room code.
+3. User enters `/call/{roomCode}`.
+4. Frontend connects to SFU using Socket.IO.
+5. WebRTC transports are created and connected through mediasoup.
+6. Local tracks are produced; remote tracks are consumed.
+7. Camera/mic/screen-share toggles are synced through signaling events.
+
+## Windows + mediasoup
+
+If mediasoup fails to install/build on Windows:
+
+- Use Node.js 20 LTS.
+- Install Visual Studio Build Tools (Desktop development with C++).
